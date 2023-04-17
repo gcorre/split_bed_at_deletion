@@ -68,7 +68,7 @@ def split_bed_by_cigar(input_bed_filename, output_bed_filename, deletion_thresho
                         cigar_frag_after = count_op(cigar_frag_after)
                         output_bed_file.write(f"{chrom}\t{frag_start}\t{current_position}\t{name}\t{score}\t{strand}\t{cigar_string}{cigar_frag_after}S\n")
                     else :
-                        cigar_string = [cigar_tuples[i] for i in range(last_del+1,tuple_current-1)] # capture cigar between 2 dels
+                        cigar_string = [cigar_tuples[i] for i in range(last_del+1,tuple_current)] # capture cigar between 2 dels
                         cigar_string = ''.join(str(item) for item in list(sum(cigar_string, ())))
 
                         cigar_frag_before = [cigar_tuples[i] for i in range(0,last_del)]
@@ -96,7 +96,12 @@ def split_bed_by_cigar(input_bed_filename, output_bed_filename, deletion_thresho
                     cigar_frag_before = [cigar_tuples[i] for i in range(0,last_del)]
                     cigar_frag_before = count_op(cigar_frag_before)
 
-                    output_bed_file.write(f"{chrom}\t{frag_start}\t{current_position}\t{name}\t{score}\t{strand}\t{cigar_frag_before}S{cigar_string}\n")
+                    if cigar_frag_before == 0:
+                        cigar_frag_before = ""
+                    else :
+                        cigar_frag_before= str(cigar_frag_before)+"S"
+
+                    output_bed_file.write(f"{chrom}\t{frag_start}\t{current_position}\t{name}\t{score}\t{strand}\t{cigar_frag_before}{cigar_string}\n")
                 else:
                     tuple_current +=1
 
