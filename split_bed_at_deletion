@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+
+## GCORRE @ GENETHON 2023
+## Split a bed file at deletion, add a modified CIGAR string in col #7 
+
+import sys
+
+def parse_cigar(cigar_string):
+    """
+    Parse a CIGAR string and return a list of tuples representing each operation.
+    """
+    cigar_tuples = []
+    current_number = ""
+    for character in cigar_string:
+        if character.isdigit():
+            current_number += character
+        else:
+            cigar_tuples.append((int(current_number), character))
+            current_number = ""
+    return cigar_tuples
+
+
+def count_op(cigar_string):
+    ops = 0
+    for length, operation in cigar_string:
+        if operation in ("M", "I", "H", "P","S"):
+            ops += length
+    return ops
+
+
+def split_bed_by_cigar(input_bed_filename, output_bed_filename, deletion_threshold):
+    """
+    Split the intervals in the input BED file according to the deletion operations in the CIGAR string.
+    Write the output intervals to the output BED file.
+    """
+    with open(input_bed_filename, "r") as input_bed_file, \
+         open(output_bed_filename, "w") as output_bed_file:
+        for line in input_bed_file:
+            fields = line.strip().split("\t")
+            chrom = fields[0]
+            start = int(fields[1])
+            name = fields[3]
+            score = fields[4]
+            strand = fields[5]
+            cigar_string = fields[6]
+            cigar_tuples = parse_cigar(cigar_string)
+            frag_start = start
+            frag_id = 1
+            current_position = start
+
+            tuple_current = 0
+            last_del=0
+
+
+
+
+
+            for length, operation in cigar_tuples:
+                cigar_frag_before=""
+                cigar_frag_after=""
+                cigar_string =""
+                if operation == "D" and length >= deletion_threshold:
+                    if frag_id == 1:
+                        cigar_string = [cigar_tuples[i] for i in range(last_del,tuple_current)] # capture cigar between 2 dels
+                        cigar_string = ''.join(str(item) for item in list(sum(cigar_string, ())))
+
+                        cigar_frag_after = [cigar_tuples[i] for i in range(tuple_current,len(cigar_tuples))]
+                        cigar_frag_after = count_op(cigar_frag_after)
+                        output_bed_file.write(f"{chrom}\t{frag_start}\t{current_position}\t{name}\t{score}\t{strand}\t{cigar_string}{cigar_frag_after}S\n")
+                    else :
+                        cigar_string = [cigar_tuples[i] for i in range(last_del+1,tuple_current-1)] # capture cigar between 2 dels
+                        cigar_string = ''.join(str(item) for item in list(sum(cigar_string, ())))
+
+                        cigar_frag_before = [cigar_tuples[i] for i in range(0,last_del)]
+                        cigar_frag_before = count_op(cigar_frag_before)
+
+                        cigar_frag_after = [cigar_tuples[i] for i in range(tuple_current,len(cigar_tuples))]
+                        cigar_frag_after = count_op(cigar_frag_after)
+
+                        output_bed_file.write(f"{chrom}\t{frag_start}\t{current_position}\t{name}\t{score}\t{strand}\t{cigar_frag_before}S{cigar_string}{cigar_frag_after}S\n")
+
+                    frag_start = current_position + length
+                    last_del = tuple_current
+                    frag_id +=1
+
+
+                    
+                if operation in ("M", "D", "N", "H", "P"):
+                    current_position += length
+
+                if tuple_current+1 == len(cigar_tuples):
+
+                    cigar_string = [cigar_tuples[i] for i in range(last_del+1,len(cigar_tuples))] # capture cigar between 2 dels
+                    cigar_string = ''.join(str(item) for item in list(sum(cigar_string, ())))
+
+                    cigar_frag_before = [cigar_tuples[i] for i in range(0,last_del)]
+                    cigar_frag_before = count_op(cigar_frag_before)
+
+                    output_bed_file.write(f"{chrom}\t{frag_start}\t{current_position}\t{name}\t{score}\t{strand}\t{cigar_frag_before}S{cigar_string}\n")
+                else:
+                    tuple_current +=1
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print(f"Usage: {sys.argv[0]} input.bed output.bed deletion_threshold")
+        sys.exit(1)
+    input_bed_filename = sys.argv[1]
+    output_bed_filename = sys.argv[2]
+    deletion_threshold = int(sys.argv[3])
+    split_bed_by_cigar(input_bed_filename, output_bed_filename, deletion_threshold)
